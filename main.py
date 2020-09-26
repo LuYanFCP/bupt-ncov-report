@@ -3,6 +3,7 @@ __all__ = (
 )
 
 from typing import Dict, List, Optional, cast
+from apscheduler.schedulers.blocking import BlockingScheduler
 
 import requests
 
@@ -57,6 +58,12 @@ CONFIG_SCHEMA: Dict[str, ConfigSchemaItem] = {
         default=None,
         type=str,
     ),
+    "SUBMISSION_TIME": ConfigSchemaItem(
+        description='（可选）每日填报的时间区间，例如默认的：7-9， 7:00， 8:00， 9:00 各尝试填报一次, 如果只选择一个时间点，只填一个时间即可！',
+        for_short='时间区间',
+        default=None,
+        type=str,
+    ),
 }
 PROGRAM_DESC = '自动填写北邮「疫情防控通」的每日上报信息。'
 
@@ -75,7 +82,7 @@ def fill_config(config: Dict[str, Optional[ConfigValue]]) -> None:
 
     for filler in fillers:
         filler.fill(config, CONFIG_SCHEMA)
-
+5
 
 def initialize_notifier(config: Dict[str, Optional[ConfigValue]]) -> List[INotifier]:
     """
@@ -126,10 +133,13 @@ def main(*wtf: object, **kwwtf: object) -> object:
         notifiers=notifiers,
     )
 
+    scheduler = BlockingScheduler()
     # 运行程序
-    program.main()
-    return program.get_exit_status()
-
+    @scheduler.scheduled_job('cron', day='*', hour=config['SUBMISSION_TIME'], minute='0')
+    def program_run():
+        program.main()
+        return program.get_exit_status()
+    scheduler.start()
 
 if __name__ == '__main__':
     status_code = main()
